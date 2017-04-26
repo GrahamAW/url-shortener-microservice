@@ -9,10 +9,21 @@ const port = process.env.PORT || 80;
 
 const app = express();
 
-// listen to get requests on any url
-app.get('*', (req, res) => {
+// Listen for
+app.get('/new/*', (req, res) => {
 
-  res.end('Hello.');
+  res.send(req.params[0]);
+
+});
+
+app.get('/:id', (req, res) => {
+
+  res.send(req.params);
+});
+
+app.get('/', (req, res) => {
+
+  res.end('TODO: Home Page');
 });
 
 app.listen(port, () => {
