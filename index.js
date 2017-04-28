@@ -6,6 +6,7 @@ const chalk = require('chalk');
 const Base62 = require('base62');
 const fnv = require('fnv-plus');
 const moment = require('moment');
+const {MongoClient}= require('mongodb');
 
 
 // listen on port set in env in deveopment or just port 80 if no env files exist
@@ -27,6 +28,19 @@ app.get('/:id', (req, res) => {
 });
 
 app.get('/', (req, res) => {
+
+  const dbAddress = `mongodb://${process.env.DBUSER}:${process.env.DBPASSWORD}@ds113871.mlab.com:13871/url-shortener-ms`;
+  console.log(dbAddress);
+  MongoClient.connect(dbAddress, (err, db) => {
+    if (err) {
+      return console.log('Could not connect to database!');
+    }
+    db.collection('urls').find().sort({'timestamp': -1}).limit(5).toArray().then((docs) => {
+      console.log(docs);
+      //TODO: send to template
+    });
+  });
+
 
   res.end('TODO: Home Page');
 
