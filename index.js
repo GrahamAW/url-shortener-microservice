@@ -7,12 +7,28 @@ const Base62 = require('base62');
 const fnv = require('fnv-plus');
 const moment = require('moment');
 const {MongoClient}= require('mongodb');
+const hbs = require('hbs');
 
 
 // listen on port set in env in deveopment or just port 80 if no env files exist
 const port = process.env.PORT || 80;
 
 const app = express();
+app.use(express.static(__dirname + '/static'));
+hbs.registerPartials(__dirname + '/views/partials');
+
+hbs.registerHelper('url_list', (urls) => {
+  const timeFormat = 'MMM-D-YYYY, h:mm a';
+  const baseUrl = 'https://evening-garden-85970.herokuapp.com/';
+
+  const urlsHTML = urls.map((url) => {
+    const timeText = moment(url.timestamp).format(timeFormat);
+    const longUrl = url.longUrl;
+    const shortUrl = `${baseUrl}${url.shortUrl}`;
+    return `<tr><td><a href='${longUrl}'>${longUrl}</a></td><td><a href='${shortUrl}'>${shortUrl}<a></td><td>${timeText}</td></tr>`;
+  });
+  return urlsHTML.join('');
+});
 
 app.get('/new/*', (req, res) => {
 
@@ -37,12 +53,14 @@ app.get('/', (req, res) => {
     }
     db.collection('urls').find().sort({'timestamp': -1}).limit(5).toArray().then((docs) => {
       console.log(docs);
-      //TODO: send to template
+      res.render('index.hbs', {
+        'urls' : docs
+      });
     });
   });
 
 
-  res.end('TODO: Home Page');
+  // res.end('TODO: Home Page');
 
 });
 
