@@ -8,6 +8,7 @@ const fnv = require('fnv-plus');
 const moment = require('moment');
 const {MongoClient}= require('mongodb');
 const hbs = require('hbs');
+const dbAddress = `mongodb://${process.env.DBUSER}:${process.env.DBPASSWORD}@ds113871.mlab.com:13871/url-shortener-ms`;
 
 
 // listen on port set in env in deveopment or just port 80 if no env files exist
@@ -38,14 +39,26 @@ app.get('/new/*', (req, res) => {
 });
 
 app.get('/:id', (req, res) => {
-
-  res.send(req.params);
-
+  // check datebase for url
+  MongoClient.connect(dbAddress, (err, db) => {
+    if (err) {
+      res.end('Could not connect to database');
+      return console.log(chalk.red('Database error.'));
+    }
+    db.collection('urls').findOne({ 'shortUrl': req.params.id}, (err, doc) => {
+      console.log(doc);
+      if (doc) {
+        res.redirect(301, doc.longUrl);
+      } else {
+        res.end('Does not exist');
+      }
+    });
+  });
 });
 
 app.get('/', (req, res) => {
 
-  const dbAddress = `mongodb://${process.env.DBUSER}:${process.env.DBPASSWORD}@ds113871.mlab.com:13871/url-shortener-ms`;
+
   console.log(dbAddress);
   MongoClient.connect(dbAddress, (err, db) => {
     if (err) {
