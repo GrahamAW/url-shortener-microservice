@@ -34,7 +34,33 @@ hbs.registerHelper('url_list', (urls) => {
 app.get('/new/*', (req, res) => {
 
   // test code
-  res.send({ 'hash' : encode(req.params[0]) });
+  // res.send({ 'hash' : encode(req.params[0]) });
+  //
+  const orginalUrl = req.params[0];
+
+  // save into datebase
+  MongoClient.connect(dbAddress, (err, db) => {
+    if (err) {
+      res.end('Could not connect to database');
+      return console.log(chalk.red('Database error.'));
+    }
+    // TODO: verify id does not already exist
+    // TODO: verify that url is valid
+    const url = {
+      'shortUrl' : encode(orginalUrl),
+      'longUrl' : orginalUrl,
+      'timestamp': parseInt(moment().format('x'))
+    };
+
+    db.collection('urls').insertOne(url, (err, doc) => {
+      if (err) {
+        res.end('Could not insert into database');
+        return console.log(chalk.red('Database error.'));
+      }
+      // TODO: better formatting of results
+      res.send(doc.ops);
+    });
+  });
 
 });
 
