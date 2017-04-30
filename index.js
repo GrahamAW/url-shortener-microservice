@@ -44,10 +44,12 @@ app.get('/new/*', (req, res) => {
       res.end('Could not connect to database');
       return console.log(chalk.red('Database error.'));
     }
-    // TODO: verify id does not already exist
+
+    const hash = encode(orginalUrl);
+
     // TODO: verify that url is valid
     const url = {
-      'shortUrl' : encode(orginalUrl),
+      'shortUrl' : hash,
       'longUrl' : orginalUrl,
       'timestamp': parseInt(moment().format('x'))
     };
@@ -85,7 +87,7 @@ app.get('/:id', (req, res) => {
 app.get('/', (req, res) => {
 
 
-  console.log(dbAddress);
+  // console.log(dbAddress);
   MongoClient.connect(dbAddress, (err, db) => {
     if (err) {
       return console.log('Could not connect to database!');
@@ -119,5 +121,20 @@ function encode(string) {
     // FNV then Base62
     const hash = Base62.encode(fnv.hash(seededString).dec());
 
-    return hash;
+    // check to see if hash exists
+    MongoClient.connect(dbAddress, (err, db) => {
+      if (err) {
+        // res.end('Could not connect to database');
+        return console.log(chalk.red('Database error.'));
+      }
+      db.collection('urls').find({ 'shortUrl': hash }).count().then((count) => {
+        if (count === 0) {
+            return hash;
+        } else {
+          encode(string);
+        }
+      });
+    });
+
+
 }
