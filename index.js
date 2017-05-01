@@ -10,7 +10,10 @@ const {
     MongoClient
 } = require('mongodb');
 const hbs = require('hbs');
+const validUrl = require('valid-url');
+
 const dbAddress = `mongodb://${process.env.DBUSER}:${process.env.DBPASSWORD}@ds113871.mlab.com:13871/url-shortener-ms`;
+const appBaseUrl = 'https://evening-garden-85970.herokuapp.com/';
 
 
 // listen on port set in env in deveopment or just port 80 if no env files exist
@@ -22,7 +25,7 @@ hbs.registerPartials(__dirname + '/views/partials');
 
 hbs.registerHelper('url_list', (urls) => {
     const timeFormat = 'MMM-D-YYYY, h:mm a';
-    const baseUrl = 'https://evening-garden-85970.herokuapp.com/';
+    const baseUrl = appBaseUrl;
 
     const urlsHTML = urls.map((url) => {
         const timeText = moment(url.timestamp).format(timeFormat);
@@ -33,21 +36,23 @@ hbs.registerHelper('url_list', (urls) => {
     return urlsHTML.join('');
 });
 
+// respond to reqeust to create new url
 app.get('/new/*', (req, res) => {
 
-    // test code
-    // res.send({ 'hash' : encode(req.params[0]) });
-    //
     const orginalUrl = req.params[0];
 
-    // save into datebase
+    if (!validUrl.isUri(orginalUrl)) {
+        return res.send({
+            'error': 'Wrong url format, make sure you have a valid protocol and real site.'
+        });
+    }
+
     MongoClient.connect(dbAddress, (err, db) => {
         if (err) {
             res.end('Could not connect to database');
             return console.log(chalk.red('Database error.'));
         }
 
-        // this needs to use a callback
         getUniqueHash(orginalUrl).then((hash) => {
             const url = {
                 'shortUrl': hash,
@@ -61,7 +66,12 @@ app.get('/new/*', (req, res) => {
                     return console.log(chalk.red('Database error.'));
                 }
                 // TODO: better formatting of results
-                res.send(doc.ops);
+                const result = {
+                    'orginal_url': doc.ops[0].longUrl,
+                    'short_url': appBaseUrl + doc.ops[0].shortUrl
+                };
+
+                res.send(result);
             });
         });
     });
@@ -88,9 +98,6 @@ app.get('/:id', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-
-
-    // console.log(dbAddress);
     MongoClient.connect(dbAddress, (err, db) => {
         if (err) {
             return console.log('Could not connect to database!');
