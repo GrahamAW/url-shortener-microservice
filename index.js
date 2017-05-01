@@ -6,7 +6,9 @@ const chalk = require('chalk');
 const Base62 = require('base62');
 const fnv = require('fnv-plus');
 const moment = require('moment');
-const {MongoClient}= require('mongodb');
+const {
+    MongoClient
+} = require('mongodb');
 const hbs = require('hbs');
 const dbAddress = `mongodb://${process.env.DBUSER}:${process.env.DBPASSWORD}@ds113871.mlab.com:13871/url-shortener-ms`;
 
@@ -19,122 +21,119 @@ app.use(express.static(__dirname + '/static'));
 hbs.registerPartials(__dirname + '/views/partials');
 
 hbs.registerHelper('url_list', (urls) => {
-  const timeFormat = 'MMM-D-YYYY, h:mm a';
-  const baseUrl = 'https://evening-garden-85970.herokuapp.com/';
+    const timeFormat = 'MMM-D-YYYY, h:mm a';
+    const baseUrl = 'https://evening-garden-85970.herokuapp.com/';
 
-  const urlsHTML = urls.map((url) => {
-    const timeText = moment(url.timestamp).format(timeFormat);
-    const longUrl = url.longUrl;
-    const shortUrl = `${baseUrl}${url.shortUrl}`;
-    return `<tr><td><a href='${longUrl}'>${longUrl}</a></td><td><a href='${shortUrl}'>${shortUrl}<a></td><td>${timeText}</td></tr>`;
-  });
-  return urlsHTML.join('');
+    const urlsHTML = urls.map((url) => {
+        const timeText = moment(url.timestamp).format(timeFormat);
+        const longUrl = url.longUrl;
+        const shortUrl = `${baseUrl}${url.shortUrl}`;
+        return `<tr><td><a href='${longUrl}'>${longUrl}</a></td><td><a href='${shortUrl}'>${shortUrl}<a></td><td>${timeText}</td></tr>`;
+    });
+    return urlsHTML.join('');
 });
 
 app.get('/new/*', (req, res) => {
 
-  // test code
-  // res.send({ 'hash' : encode(req.params[0]) });
-  //
-  const orginalUrl = req.params[0];
+    // test code
+    // res.send({ 'hash' : encode(req.params[0]) });
+    //
+    const orginalUrl = req.params[0];
 
-  // save into datebase
-  MongoClient.connect(dbAddress, (err, db) => {
-    if (err) {
-      res.end('Could not connect to database');
-      return console.log(chalk.red('Database error.'));
-    }
+    // save into datebase
+    MongoClient.connect(dbAddress, (err, db) => {
+        if (err) {
+            res.end('Could not connect to database');
+            return console.log(chalk.red('Database error.'));
+        }
 
-    const hash = encode(orginalUrl);
+        // this needs to use a callback
+        getUniqueHash(orginalUrl).then((hash) => {
+            const url = {
+                'shortUrl': hash,
+                'longUrl': orginalUrl,
+                'timestamp': parseInt(moment().format('x'))
+            };
 
-    // TODO: verify that url is valid
-    const url = {
-      'shortUrl' : hash,
-      'longUrl' : orginalUrl,
-      'timestamp': parseInt(moment().format('x'))
-    };
-
-    db.collection('urls').insertOne(url, (err, doc) => {
-      if (err) {
-        res.end('Could not insert into database');
-        return console.log(chalk.red('Database error.'));
-      }
-      // TODO: better formatting of results
-      res.send(doc.ops);
+            db.collection('urls').insertOne(url, (err, doc) => {
+                if (err) {
+                    res.end('Could not insert into database');
+                    return console.log(chalk.red('Database error.'));
+                }
+                // TODO: better formatting of results
+                res.send(doc.ops);
+            });
+        });
     });
-  });
-
 });
 
 app.get('/:id', (req, res) => {
-  // check datebase for url
-  MongoClient.connect(dbAddress, (err, db) => {
-    if (err) {
-      res.end('Could not connect to database');
-      return console.log(chalk.red('Database error.'));
-    }
-    db.collection('urls').findOne({ 'shortUrl': req.params.id}, (err, doc) => {
-      console.log(doc);
-      if (doc) {
-        res.redirect(301, doc.longUrl);
-      } else {
-        res.end('Does not exist');
-      }
+    // check datebase for url
+    MongoClient.connect(dbAddress, (err, db) => {
+        if (err) {
+            res.end('Could not connect to database');
+            return console.log(chalk.red('Database error.'));
+        }
+        db.collection('urls').findOne({
+            'shortUrl': req.params.id
+        }, (err, doc) => {
+            console.log(doc);
+            if (doc) {
+                res.redirect(301, doc.longUrl);
+            } else {
+                res.end('Does not exist');
+            }
+        });
     });
-  });
 });
 
 app.get('/', (req, res) => {
 
 
-  // console.log(dbAddress);
-  MongoClient.connect(dbAddress, (err, db) => {
-    if (err) {
-      return console.log('Could not connect to database!');
-    }
-    db.collection('urls').find().sort({'timestamp': -1}).limit(5).toArray().then((docs) => {
-      console.log(docs);
-      res.render('index.hbs', {
-        'urls' : docs
-      });
+    // console.log(dbAddress);
+    MongoClient.connect(dbAddress, (err, db) => {
+        if (err) {
+            return console.log('Could not connect to database!');
+        }
+        db.collection('urls').find().sort({
+            'timestamp': -1
+        }).limit(5).toArray().then((docs) => {
+            console.log(docs);
+            res.render('index.hbs', {
+                'urls': docs
+            });
+        });
     });
-  });
-
-
-  // res.end('TODO: Home Page');
-
 });
 
 app.listen(port, () => {
-  console.log(chalk.yellow(`Listening on port: ${port}`));
+    console.log(chalk.yellow(`Listening on port: ${port}`));
 });
 
+function getUniqueHash(orginalUrl) {
+    return new Promise((resolve, reject) => {
+        // add unix timestamp to string
+        const seededString = moment().format('x') + orginalUrl;
 
-// generate a hash by first taking a string + timestamp and hashing it with the
-// FNV algorithm, then chaging that integer to base62.
-// May not be unique.
-function encode(string) {
+        // FNV then Base62
+        const hash = Base62.encode(fnv.hash(seededString).dec());
 
-    // add unix timestamp to string
-    const seededString = moment().format('x') + string;
-
-    // FNV then Base62
-    const hash = Base62.encode(fnv.hash(seededString).dec());
-
-    // check to see if hash exists
-    MongoClient.connect(dbAddress, (err, db) => {
-      if (err) {
-        // res.end('Could not connect to database');
-        return console.log(chalk.red('Database error.'));
-      }
-      db.collection('urls').find({ 'shortUrl': hash }).count().then((count) => {
-        if (count === 0) {
-            return hash;
-        } else {
-          encode(string);
-        }
-      });
+        // check to see if hash exists
+        MongoClient.connect(dbAddress, (err, db) => {
+            if (err) {
+                return reject(err);
+            }
+            // if the hash is not found in the db it is unique, resolve with
+            // the hash. If it is found then call this function recursively.
+            db.collection('urls').find({
+                'shortUrl': hash
+            }).count().then((count) => {
+                if (count === 0) {
+                    resolve(hash);
+                } else {
+                    getUniqueHash(orginalUrl);
+                }
+            });
+        });
     });
-
-
 }
